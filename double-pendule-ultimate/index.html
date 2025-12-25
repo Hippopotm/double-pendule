@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Double Pendule Ultimate</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="ui">
+  <button id="toggle">⏸ Pause</button>
+  <button id="reset">🔄 Reset</button>
+  <button id="fullscreen">⛶ Plein écran</button>
+
+  <div class="row">
+    <label>Longueur bras 1</label>
+    <input type="range" id="l1" min="50" max="300" value="150">
+  </div>
+
+  <div class="row">
+    <label>Longueur bras 2</label>
+    <input type="range" id="l2" min="50" max="300" value="150">
+  </div>
+
+  <div class="row">
+    <label>Angle 1 (°)</label>
+    <input type="range" id="a1" min="0" max="180" value="90">
+  </div>
+
+  <div class="row">
+    <label>Angle 2 (°)</label>
+    <input type="range" id="a2" min="0" max="180" value="90">
+  </div>
+
+  <div class="row">
+    <label>
+      <input type="checkbox" id="friction"> Activer friction
+    </label>
+  </div>
+
+  <div class="row">
+    <label>
+      <input type="checkbox" id="trail"> Traînée visuelle
+    </label>
+  </div>
+
+  <div class="row">
+    <label>Palette de couleurs :</label>
+    <select id="palette">
+      <option value="classic">Classique</option>
+      <option value="neon">Néon</option>
+      <option value="fire">Feu</option>
+      <option value="ice">Glace</option>
+      <option value="matrix">Matrix</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <label>
+      <input type="checkbox" id="chaos"> Mode Chaos Extrême
+    </label>
+  </div>
+
+  <div class="row">
+    <span id="fps">FPS : --</span>
+  </div>
+</div>
+
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.onresize = resizeCanvas;
+
+const toggle = document.getElementById("toggle");
+const resetBtn = document.getElementById("reset");
+const fullscreenBtn = document.getElementById("fullscreen");
+
+const sliderL1 = document.getElementById("l1");
+const sliderL2 = document.getElementById("l2");
+const sliderA1 = document.getElementById("a1");
+const sliderA2 = document.getElementById("a2");
+
+const chkFriction = document.getElementById("friction");
+const chkTrail = document.getElementById("trail");
+const chkChaos = document.getElementById("chaos");
+
+const paletteSelector = document.getElementById("palette");
+const fpsDisplay = document.getElementById("fps");
+
+const palettes = {
+  classic: { arm: "white", m1: "cyan", m2: "magenta" },
+  neon: { arm: "lime", m1: "#00faff", m2: "#ff00f6" },
+  fire: { arm: "#ff8800", m1: "#ff2200", m2: "#ffdd00" },
+  ice: { arm: "#99ddff", m1: "#00aaff", m2: "#0066ff" },
+  matrix: { arm: "#00ff00", m1: "#00aa00", m2: "#008800" }
+};
+
+let g = 9.81;
+let l1 = 150;
+let l2 = 150;
+let m1 = 1;
+let m2 = 1;
+let a1 = Math.PI/2;
+let a2 = Math.PI/2 + 0.001;
+let a1_v = 0;
+let a2_v = 0;
+
+let running = true;
+
+toggle.onclick = () => {
+  running = !running;
+  toggle.textContent = running ? "⏸ Pause" : "▶ Reprendre";
+};
+
+resetBtn.onclick = () => {
+  a1 = sliderA1.value * Math.PI/180;
+  a2 = sliderA2.value * Math.PI/180;
+  a1_v = a2_v = 0;
+};
+
+fullscreenBtn.onclick = () => {
+  if (!document.fullscreenElement) {
+    document.body.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+};
+
+sliderA1.oninput = resetBtn.onclick;
+sliderA2.oninput = resetBtn.onclick;
+sliderL1.oninput = () => { l1 = Number(sliderL1.value); };
+sliderL2.oninput = () => { l2 = Number(sliderL2.value); };
+
+function step() {
+  if (chkChaos.checked) {
+    a1 += (Math.random() - 0.5) * 0.01;
+    a2 += (Math.random() - 0.5) * 0.01;
+  }
+
+  const num1 = -g * (2*m1 + m2) * Math.sin(a1);
+  const num2 = -m2 * g * Math.sin(a1 - 2*a2);
+  const num3 = -2*Math.sin(a1 - a2)*m2*(a2_v*a2_v*l2 + a1_v*a1_v*l1*Math.cos(a1 - a2));
+  const den = l1 * (2*m1 + m2 - m2*Math.cos(2*a1 - 2*a2));
+
+  const a1_a = (num1 + num2 + num3) / den;
+
+  const num4 = 2*Math.sin(a1 - a2)*(a1_v*a1_v*l1*(m1+m2) + g*(m1+m2)*Math.cos(a1) + a2_v*a2_v*l2*m2*Math.cos(a1 - a2));
+  const den2 = l2 * (2*m1 + m2 - m2*Math.cos(2*a1 - 2*a2));
+
+  const a2_a = num4 / den2;
+
+  a1_v += a1_a;
+  a2_v += a2_a;
+
+  if (chkFriction.checked) {
+    a1_v *= 0.995;
+    a2_v *= 0.995;
+  }
+
+  a1 += a1_v;
+  a2 += a2_v;
+}
+
+function draw() {
+  const palette = palettes[paletteSelector.value];
+
+  if (!chkTrail.checked) {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+  } else {
+    ctx.fillStyle = "rgba(0,0,0,0.05)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+
+  const originX = canvas.width / 2;
+  const originY = canvas.height / 3;
+
+  const x1 = originX + l1 * Math.sin(a1);
+  const y1 = originY + l1 * Math.cos(a1);
+
+  const x2 = x1 + l2 * Math.sin(a2);
+  const y2 = y1 + l2 * Math.cos(a2);
+
+  ctx.strokeStyle = palette.arm;
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.moveTo(originX, originY);
+  ctx.lineTo(x1, y1);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+
+  ctx.fillStyle = palette.m1;
+  ctx.beginPath();
+  ctx.arc(x1, y1, 8, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle = palette.m2;
+  ctx.beginPath();
+  ctx.arc(x2, y2, 10, 0, Math.PI*2);
+  ctx.fill();
+}
+
+let lastTime = performance.now();
+let frameCount = 0;
+
+function loop() {
+  if (running) step();
+  draw();
+
+  frameCount++;
+  const now = performance.now();
+  if (now - lastTime >= 1000) {
+    fpsDisplay.textContent = "FPS : " + frameCount;
+    frameCount = 0;
+    lastTime = now;
+  }
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
